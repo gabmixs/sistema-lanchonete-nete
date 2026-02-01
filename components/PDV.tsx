@@ -230,7 +230,7 @@ export default function PDV() {
         };
 
         // Chama o servidor rodando na porta 3001
-        const response = await fetch('http://localhost:3001/emitir-fiscal', {
+        const response = await fetch('https://sistema-lanchonete-nete.onrender.com/emitir-fiscal', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)

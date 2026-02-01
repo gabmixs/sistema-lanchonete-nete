@@ -12,9 +12,9 @@ interface ConfigContextType {
 }
 
 const defaultConfig: AppConfig = {
-  companyName: 'Lanchonete do Biel',
-  cnpj: '12.345.678/0001-99',
-  address: 'Rua das Esfirras, 123 - Centro, Indaiatuba - SP'
+  companyName: 'Lanchonete da Nete',
+  cnpj: '21.464.135.0001/88',
+  address: 'Rua Sorocaba, 285 - Jardim Paulista, Várzea Paulista - SP'
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);

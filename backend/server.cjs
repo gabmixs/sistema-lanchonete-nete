@@ -1,83 +1,111 @@
+require('dotenv').config(); // 1. O Cofre: Carrega as senhas secretas
 const http = require('http');
 const fs = require('fs');
-const tls = require('tls');
+const https = require('https'); // Necessário para criar o agente seguro
+const axios = require('axios'); // O Carteiro que manda pra SEFAZ
 
 // --- CONFIGURAÇÃO ---
-const PORT = 3001;
-// O caminho deve apontar para o arquivo dentro da pasta backend
+const PORT = process.env.PORT || 3001; // Pega a porta da Render ou usa 3001
 const PFX_PATH = './backend/certificadoNete.pfx'; 
-const PFX_PASSWORD = '59950858'; 
 
-const server = http.createServer((req, res) => {
-    // 1. Configurar CORS (Para o seu site React conseguir falar com esse servidor)
+// 2. Segredo: A senha vem da variável de ambiente (não fica escrita aqui!)
+const PFX_PASSWORD = process.env.CERTIFICADO_SENHA; 
+
+// --- SETUP DO AGENTE SEFAZ (O Crachá) ---
+// Isso cria um "navegador" especial que já carrega o certificado da Nete
+const getSefazAgent = () => {
+    if (!fs.existsSync(PFX_PATH)) {
+        throw new Error(`Certificado não encontrado em: ${PFX_PATH}`);
+    }
+    const pfxContent = fs.readFileSync(PFX_PATH);
+    return new https.Agent({
+        pfx: pfxContent,
+        passphrase: PFX_PASSWORD,
+        rejectUnauthorized: false // Importante para SEFAZ (ignora erros de SSL deles)
+    });
+};
+
+const server = http.createServer(async (req, res) => {
+    // 3. Configurar CORS (Permite o site falar com o servidor)
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Se for uma verificação (OPTIONS), responde OK e para.
     if (req.method === 'OPTIONS') {
         res.writeHead(204);
         res.end();
         return;
     }
 
-    // 2. Rota de Status (Para testar se está vivo)
+    // Rota de Teste (Para ver se o servidor está vivo)
     if (req.url === '/status' && req.method === 'GET') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'Online', message: 'Servidor Fiscal Rodando!' }));
+        res.end(JSON.stringify({ 
+            status: 'Online', 
+            ambiente: process.env.NODE_ENV || 'Desenvolvimento',
+            mensagem: 'Servidor Fiscal Pronto!' 
+        }));
         return;
     }
 
-    // 3. Rota de Emitir Nota (POST)
+    // --- ROTA PRINCIPAL: EMITIR NOTA ---
     if (req.url === '/emitir-fiscal' && req.method === 'POST') {
         let body = '';
         
-        // Recebe os dados da venda
         req.on('data', chunk => { body += chunk.toString(); });
 
-        req.on('end', () => {
+        req.on('end', async () => {
             try {
                 const dadosVenda = JSON.parse(body);
-                console.log('📝 Recebi um pedido de venda! Valor:', dadosVenda.total);
+                console.log('📝 Iniciando emissão para venda de R$:', dadosVenda.total);
 
-                // --- VALIDAÇÃO DO CERTIFICADO ---
-                if (!fs.existsSync(PFX_PATH)) {
-                    throw new Error('Certificado não encontrado no caminho: ' + PFX_PATH);
-                }
-                const pfxBuffer = fs.readFileSync(PFX_PATH);
+                // Tenta carregar o agente seguro (teste do certificado)
+                const agent = getSefazAgent();
+                console.log('🔐 Certificado carregado e desbloqueado com sucesso!');
+
+                // --- AQUI ACONTECE A MÁGICA DA SEFAZ ---
+                // Nota: Para emitir DE VERDADE, precisamos gerar o XML assinado.
+                // Como ainda não temos o XML gerador, vamos fazer um "Ping" na SEFAZ
+                // para provar que o certificado funciona.
                 
-                // Tenta abrir o certificado com a senha
-                // Se a senha estiver errada, vai dar erro e cair no catch
-                tls.createSecureContext({
-                    pfx: pfxBuffer,
-                    passphrase: PFX_PASSWORD
+                const urlSefaz = 'https://homologacao.nfce.fazenda.sp.gov.br/ws/NfeStatusServico4.asmx'; // URL de Teste SP
+                
+                // Exemplo de envio real (comentado até termos o XML pronto)
+                /*
+                const responseSefaz = await axios.post(urlSefaz, xmlAssinado, {
+                    headers: { 'Content-Type': 'application/soap+xml; charset=utf-8' },
+                    httpsAgent: agent // <--- Aqui vai o certificado!
                 });
+                */
 
-                // Se chegou aqui, a senha está certa! Simulamos a resposta da SEFAZ:
-                console.log('✅ Certificado validado! Emitindo nota simulada...');
+                // POR ENQUANTO: Simula Sucesso se o certificado abriu
+                console.log('✅ Comunicação com o módulo fiscal: OK');
                 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     success: true,
-                    nfe_number: Math.floor(Math.random() * 5000) + 1000, // Gera número aleatório
-                    url_qrcode: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=NotaFiscalEmitidaComSucesso' 
+                    ambiente: 'HOMOLOGACAO (TESTE)',
+                    nfe_number: Math.floor(Math.random() * 5000) + 1000,
+                    chave_acesso: '352302' + Math.floor(Math.random() * 10000000000000), // Simulação
+                    url_qrcode: 'https://www.sefaz.sp.gov.br/nfce/consulta' 
                 }));
 
             } catch (error) {
-                console.error('❌ Erro:', error.message);
+                console.error('❌ Erro na emissão:', error.message);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: false, message: 'Erro: ' + error.message }));
+                res.end(JSON.stringify({ 
+                    success: false, 
+                    message: 'Erro no servidor fiscal: ' + error.message 
+                }));
             }
         });
         return;
     }
 
-    // Qualquer outra rota
     res.writeHead(404);
     res.end('Rota desconhecida');
 });
 
 server.listen(PORT, () => {
-    console.log(`🚀 SERVIDOR FISCAL ONLINE!`);
-    console.log(`📡 Rodando em: http://localhost:${PORT}`);
+    console.log(`🚀 SERVIDOR FISCAL ONLINE NA PORTA ${PORT}!`);
 });

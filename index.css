@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 
+  CONFIGURAÇÃO DE IMPRESSÃO TÉRMICA 
+  Focada em impressoras de 58mm e 80mm
+*/
+@media print {
+  /* Remove margens padrão do navegador (datas, URLs, títulos) */
+  @page {
+    margin: 0;
+    size: auto; 
+  }
+
+  /* Esconde TUDO na página por padrão */
+  body {
+    visibility: hidden;
+    background-color: #fff;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Força a visibilidade APENAS do container do cupom e seus filhos */
+  #cupom-fiscal, 
+  #cupom-fiscal * {
+    visibility: visible;
+  }
+
+  /* 
+    Posiciona o cupom no topo absoluto da folha de impressão.
+    Remove sombras, bordas e garante fundo branco e texto preto puro (economia de tinta).
+  */
+  #cupom-fiscal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%; /* Ocupa 100% da largura do papel definido no driver */
+    margin: 0;
+    padding: 0;
+    background-color: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
+    font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada alinha melhor em impressoras térmicas */
+  }
+
+  /* Esconde botões de ação (Imprimir/Fechar) na hora da impressão */
+  .no-print, button {
+    display: none !important;
+  }
+  
+  /* Ajustes finos para economia de tinta e legibilidade */
+  #cupom-fiscal h3, 
+  #cupom-fiscal p, 
+  #cupom-fiscal span {
+    color: #000 !important;
+    text-shadow: none !important;
+  }
+}
